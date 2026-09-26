@@ -71,6 +71,12 @@ function senderColor(name) {
   return WA_COLORS[Math.abs(h) % WA_COLORS.length];
 }
 
+// "2018-06-15" → "15 Jun 2018"
+function fmtIsoDate(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 const MessageRow = memo(function MessageRow({ msg, isPrimary, isLast, showName, mediaMap }) {
   return (
     <div className={`message-wrapper ${isPrimary ? 'sent' : 'received'} ${isLast ? 'tail' : ''}`}>
@@ -93,7 +99,10 @@ const MessageRow = memo(function MessageRow({ msg, isPrimary, isLast, showName, 
   );
 });
 
-export default function ChatView({ messages, primaryUser, mediaMap = {}, onChangeUser, onBack }) {
+export default function ChatView({
+  messages, senders, primaryUser, mediaMap = {},
+  dateRange, onOpenDateRange, onClearDateRange, onChangeUser, onBack,
+}) {
   const scrollRef   = useRef(null);
   const contentRef  = useRef(null);
   const stickRef    = useRef(true);   // pinned to bottom?
@@ -101,11 +110,8 @@ export default function ChatView({ messages, primaryUser, mediaMap = {}, onChang
   const [visibleCount, setVisibleCount] = useState(PAGE);
   const [showJump, setShowJump] = useState(false);
 
-  const uniqueSenders = useMemo(() => {
-    const s = new Set();
-    messages.forEach(m => { if (!m.isSystem && m.sender) s.add(m.sender); });
-    return [...s];
-  }, [messages]);
+  // Senders come from the whole chat so the title doesn't change when filtering
+  const uniqueSenders = senders;
 
   const chatName = useMemo(() => {
     const others = uniqueSenders.filter(s => s !== primaryUser);
@@ -208,11 +214,42 @@ export default function ChatView({ messages, primaryUser, mediaMap = {}, onChang
             {mediaCount > 0 && ` · ${mediaCount.toLocaleString()} media`}
           </div>
         </div>
+        {onOpenDateRange && (
+          <button
+            className={`wa-icon-btn ${dateRange ? 'active' : ''}`}
+            onClick={onOpenDateRange}
+            aria-label="Filter by date range"
+            title="Filter by date range"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </button>
+        )}
         <button className="wa-user-btn" onClick={onChangeUser} title="Change who you are">
           <span className="wa-user-label">You:</span>
           <span className="wa-user-name">{primaryUser || 'Not set'}</span>
         </button>
       </div>
+
+      {dateRange && (
+        <div className="range-bar">
+          <button className="range-bar-label" onClick={onOpenDateRange}>
+            📅 {fmtIsoDate(dateRange.from)} – {fmtIsoDate(dateRange.to)}
+          </button>
+          <button className="range-bar-clear" onClick={onClearDateRange} aria-label="Clear date filter">✕</button>
+        </div>
+      )}
+
+      {messages.length === 0 && (
+        <div className="chat-empty">
+          <p>No messages in this date range.</p>
+          <button className="range-apply-btn" onClick={onOpenDateRange}>Change dates</button>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="chat-messages-container" ref={scrollRef} onScroll={onScroll}>

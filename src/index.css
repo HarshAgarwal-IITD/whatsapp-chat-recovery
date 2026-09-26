@@ -251,6 +251,52 @@ body {
 .wa-user-label { color: var(--wa-text-sec); }
 .wa-user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 
+.wa-icon-btn {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  background: transparent; border: none; border-radius: 50%;
+  color: var(--wa-text-sec);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.2s, color 0.2s;
+}
+.wa-icon-btn:hover, .wa-icon-btn:active { background: rgba(255,255,255,0.08); color: var(--wa-text); }
+.wa-icon-btn.active { color: var(--wa-green); }
+
+/* Active date filter bar */
+.range-bar {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 10px 6px 16px;
+  background: rgba(0,168,132,0.12);
+  border-bottom: 1px solid rgba(0,168,132,0.25);
+}
+.range-bar-label {
+  flex: 1; min-width: 0;
+  background: none; border: none; text-align: left;
+  color: var(--wa-text); font-family: inherit; font-size: 0.8rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; padding: 4px 0;
+}
+.range-bar-clear {
+  flex-shrink: 0;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(255,255,255,0.06); border: none;
+  color: var(--wa-text-sec); font-size: 0.8rem; cursor: pointer;
+  touch-action: manipulation;
+}
+.range-bar-clear:hover, .range-bar-clear:active { background: rgba(255,255,255,0.12); color: var(--wa-text); }
+
+.chat-empty {
+  position: absolute; inset: 0; top: 120px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 40px 20px;
+  color: var(--wa-text-sec); font-size: 0.9rem; text-align: center;
+  pointer-events: none;
+}
+.chat-empty button { pointer-events: auto; width: auto; padding: 10px 22px; }
+
 /* Messages scroll area */
 .chat-messages-container {
   flex: 1;
@@ -575,6 +621,58 @@ body {
 }
 .modal-skip:hover { color: var(--wa-text); background: rgba(255,255,255,0.05); }
 
+/* ─── Date range modal ───────────────────────────────────── */
+.range-presets { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 4px 0; }
+.range-preset-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--wa-text);
+  padding: 7px 14px;
+  border-radius: 16px;
+  font-family: inherit; font-size: 0.8rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.range-preset-btn:hover, .range-preset-btn:active { background: rgba(255,255,255,0.12); border-color: var(--wa-green); }
+
+.range-fields { width: 100%; display: flex; gap: 10px; }
+.range-field {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 0.75rem; color: var(--wa-text-sec);
+}
+.range-field input {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  color: var(--wa-text);
+  color-scheme: dark;
+  font-family: inherit;
+  font-size: 16px; /* ≥16px stops iOS zooming in on focus */
+  padding: 10px 10px;
+  min-height: 44px;
+  outline: none;
+}
+.range-field input:focus { border-color: var(--wa-green); }
+
+.range-error { font-size: 0.8rem; color: #fca5a5; }
+
+.range-apply-btn {
+  width: 100%;
+  margin-top: 6px;
+  background: var(--wa-teal);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 13px 16px;
+  font-family: inherit; font-size: 0.92rem; font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.range-apply-btn:active { filter: brightness(0.9); }
+.range-apply-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 /* ─── Animations ─────────────────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
@@ -608,6 +706,7 @@ body {
   .wa-avatar { width: 34px; height: 34px; }
   .wa-user-btn { padding: 6px 10px; }
   .wa-user-label { display: none; }
+  .wa-icon-btn { width: 36px; height: 36px; }
 
   .app-header { padding-top: max(14px, env(safe-area-inset-top)); }
 
