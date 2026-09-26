@@ -2,27 +2,40 @@ import { useState, useCallback } from 'react';
 import JSZip from 'jszip';
 import { parseWhatsAppChat } from '../utils/parser';
 
-const MEDIA_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'opus', 'ogg', 'mp3', 'aac', 'm4a', 'pdf']);
+const baseName = path => path.split('/').pop();
+
+// macOS-zipped exports carry "__MACOSX/._name" resource forks that look like real files
+const isJunk = path => path.startsWith('__MACOSX/') || path.includes('/__MACOSX/') || baseName(path).startsWith('._') || baseName(path) === '.DS_Store';
+
+/** Pick the chat transcript: "_chat.txt" (iOS), "WhatsApp Chat with …txt" (Android), else the largest .txt */
+function pickChatFile(candidates, getPath, getSize) {
+  const txts = candidates.filter(c => !isJunk(getPath(c)) && /\.txt$/i.test(getPath(c)));
+  return txts.find(c => baseName(getPath(c)) === '_chat.txt')
+    || txts.find(c => /^whatsapp chat/i.test(baseName(getPath(c))))
+    || txts.sort((a, b) => getSize(b) - getSize(a))[0];
+}
+
+/** Decode the transcript, handling UTF-8 (with or without BOM) and UTF-16 exports */
+function decodeText(buffer) {
+  const bytes = new Uint8Array(buffer);
+  if (bytes[0] === 0xFF && bytes[1] === 0xFE) return new TextDecoder('utf-16le').decode(bytes);
+  if (bytes[0] === 0xFE && bytes[1] === 0xFF) return new TextDecoder('utf-16be').decode(bytes);
+  return new TextDecoder('utf-8').decode(bytes);
+}
 
 async function processZip(file, setProgress) {
   setProgress('Reading ZIP…');
   const zip = await JSZip.loadAsync(file);
+  const entries = Object.values(zip.files).filter(f => !f.dir && !isJunk(f.name));
 
-  // Find chat txt file
-  const txtEntry = Object.values(zip.files).find(
-    f => !f.dir && (f.name.endsWith('_chat.txt') || f.name.endsWith('.txt'))
-  );
+  const txtEntry = pickChatFile(entries, f => f.name, f => f._data?.uncompressedSize ?? 0);
   if (!txtEntry) throw new Error('No chat .txt file found inside the ZIP.');
 
   setProgress('Parsing chat…');
-  const chatText = await txtEntry.async('text');
+  const chatText = decodeText(await txtEntry.async('arraybuffer'));
 
-  // Build media map from all media entries in the zip
-  const mediaEntries = Object.values(zip.files).filter(f => {
-    if (f.dir) return false;
-    const ext = f.name.split('.').pop().toLowerCase();
-    return MEDIA_EXTS.has(ext);
-  });
+  // Every other file is a potential attachment, whatever its extension (heic, webm, vcf, docx…)
+  const mediaEntries = entries.filter(f => f !== txtEntry);
 
   setProgress(`Loading ${mediaEntries.length} media files…`);
 
@@ -34,8 +47,7 @@ async function processZip(file, setProgress) {
     await Promise.all(batch.map(async entry => {
       try {
         const blob = await entry.async('blob');
-        const filename = entry.name.split('/').pop(); // strip folder prefix
-        mediaMap[filename] = URL.createObjectURL(blob);
+        mediaMap[baseName(entry.name)] = URL.createObjectURL(blob);
       } catch { /* skip unreadable entries */ }
     }));
     setProgress(`Loading media… ${Math.min(i + BATCH, mediaEntries.length)} / ${mediaEntries.length}`);
@@ -45,19 +57,16 @@ async function processZip(file, setProgress) {
 }
 
 async function processFolder(fileList, setProgress) {
-  const files = Array.from(fileList);
+  const files = Array.from(fileList).filter(f => !isJunk(f.webkitRelativePath || f.name));
 
-  const txtFile = files.find(f => f.name === '_chat.txt') || files.find(f => f.name.endsWith('.txt'));
+  const txtFile = pickChatFile(files, f => f.webkitRelativePath || f.name, f => f.size);
   if (!txtFile) throw new Error('No WhatsApp chat .txt file found in the folder.');
 
   setProgress(`Found ${files.length} files. Reading chat…`);
 
-  const chatText = await txtFile.text();
+  const chatText = decodeText(await txtFile.arrayBuffer());
 
-  const mediaFiles = files.filter(f => {
-    const ext = f.name.split('.').pop().toLowerCase();
-    return MEDIA_EXTS.has(ext);
-  });
+  const mediaFiles = files.filter(f => f !== txtFile);
 
   setProgress(`Mapping ${mediaFiles.length} media files…`);
   const mediaMap = {};
@@ -85,7 +94,7 @@ export default function FileUpload({ onParsed }) {
       const files = Array.from(fileList);
 
       // Single ZIP
-      const zipFile = files.find(f => f.name.endsWith('.zip'));
+      const zipFile = files.find(f => /\.zip$/i.test(f.name));
       if (zipFile) {
         const { chatText, mediaMap } = await processZip(zipFile, setProgress);
         finish(chatText, mediaMap);

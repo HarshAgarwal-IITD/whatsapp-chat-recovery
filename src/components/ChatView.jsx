@@ -64,8 +64,8 @@ function MediaAttachment({ filename, mediaMap, onOpenMedia }) {
 }
 
 function fmtTime(raw = '') {
-  // "9:26:35 PM" → "9:26 PM"
-  return raw.replace(/:\d{2}(\s*[aApP][mM])/, '$1').trim();
+  // "9:26:35 PM" → "9:26 PM", "21:26:35" → "21:26"
+  return raw.replace(/^(\d{1,2}:\d{2}):\d{2}/, '$1').trim();
 }
 
 const WA_COLORS = ['#e06c75','#e5c07b','#98c379','#56b6c2','#61afef','#c678dd','#d19a66'];
