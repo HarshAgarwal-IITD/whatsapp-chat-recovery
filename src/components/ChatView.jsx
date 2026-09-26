@@ -1,6 +1,6 @@
 import { memo, useMemo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { dateBucket, formatDateLabel } from '../utils/parser';
-import ImageLightbox from './ImageLightbox';
+import MediaLightbox from './MediaLightbox';
 
 const IMG_EXTS   = new Set(['jpg','jpeg','png','gif','webp']);
 const VIDEO_EXTS = new Set(['mp4','mov']);
@@ -21,7 +21,7 @@ function attachType(filename) {
   return 'file';
 }
 
-function MediaAttachment({ filename, mediaMap, onOpenImage }) {
+function MediaAttachment({ filename, mediaMap, onOpenMedia }) {
   const url  = mediaMap[filename];
   const type = attachType(filename);
 
@@ -34,14 +34,18 @@ function MediaAttachment({ filename, mediaMap, onOpenImage }) {
   if (type === 'image') return (
     <div className="attachment attachment-image">
       <img src={url} alt={filename} loading="lazy" decoding="async"
-        onClick={() => onOpenImage(filename)} className="chat-image" />
+        onClick={() => onOpenMedia(filename)} className="chat-image" />
     </div>
   );
 
   if (type === 'video') return (
-    <div className="attachment attachment-video">
-      <video controls playsInline preload="metadata" className="chat-video"><source src={url}/></video>
-    </div>
+    <button className="attachment attachment-video" onClick={() => onOpenMedia(filename)} aria-label="Play video">
+      {/* #t=0.1 makes mobile browsers render the first frame as a preview */}
+      <video src={`${url}#t=0.1`} muted playsInline preload="metadata" className="chat-video" tabIndex={-1} />
+      <span className="video-play-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><polygon points="8 5 19 12 8 19" /></svg>
+      </span>
+    </button>
   );
 
   if (type === 'audio') return (
@@ -77,7 +81,7 @@ function fmtIsoDate(iso) {
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const MessageRow = memo(function MessageRow({ msg, isPrimary, isLast, showName, mediaMap, onOpenImage }) {
+const MessageRow = memo(function MessageRow({ msg, isPrimary, isLast, showName, mediaMap, onOpenMedia }) {
   return (
     <div className={`message-wrapper ${isPrimary ? 'sent' : 'received'} ${isLast ? 'tail' : ''}`}>
       <div className="message-bubble">
@@ -87,7 +91,7 @@ const MessageRow = memo(function MessageRow({ msg, isPrimary, isLast, showName, 
           </div>
         )}
         {msg.attachment && (
-          <MediaAttachment filename={msg.attachment} mediaMap={mediaMap} onOpenImage={onOpenImage} />
+          <MediaAttachment filename={msg.attachment} mediaMap={mediaMap} onOpenMedia={onOpenMedia} />
         )}
         {msg.text && <div className="message-text">{msg.text}</div>}
         <div className="message-meta">
@@ -149,12 +153,15 @@ export default function ChatView({
     return items;
   }, [messages]);
 
-  // Every viewable image in the chat, in order — the lightbox navigates through these
-  const images = useMemo(() => {
+  // Every viewable image and video in the chat, in order — the lightbox navigates through these
+  const mediaItems = useMemo(() => {
     const list = [];
     messages.forEach(m => {
-      if (!m.attachment || !mediaMap[m.attachment] || attachType(m.attachment) !== 'image') return;
+      if (!m.attachment || !mediaMap[m.attachment]) return;
+      const type = attachType(m.attachment);
+      if (type !== 'image' && type !== 'video') return;
       list.push({
+        type,
         url: mediaMap[m.attachment],
         name: m.attachment,
         sender: m.sender,
@@ -164,10 +171,10 @@ export default function ChatView({
     return list;
   }, [messages, mediaMap]);
 
-  const openImage = useCallback(filename => {
-    const i = images.findIndex(img => img.name === filename);
+  const onOpenMedia = useCallback(filename => {
+    const i = mediaItems.findIndex(it => it.name === filename);
     if (i !== -1) setLightboxIndex(i);
-  }, [images]);
+  }, [mediaItems]);
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
 
   const start = Math.max(0, renderItems.length - visibleCount);
@@ -304,7 +311,7 @@ export default function ChatView({
                 isLast={item.isLast}
                 showName={!isPrimary && item.isFirst && uniqueSenders.length > 1}
                 mediaMap={mediaMap}
-                onOpenImage={openImage}
+                onOpenMedia={onOpenMedia}
               />
             );
           })}
@@ -312,8 +319,8 @@ export default function ChatView({
       </div>
 
       {lightboxIndex !== null && (
-        <ImageLightbox
-          images={images}
+        <MediaLightbox
+          items={mediaItems}
           index={lightboxIndex}
           onIndexChange={setLightboxIndex}
           onClose={closeLightbox}
