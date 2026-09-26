@@ -3,7 +3,7 @@ import FileUpload from './components/FileUpload';
 import ChatView from './components/ChatView';
 import UserSelectModal from './components/UserSelectModal';
 import DateRangeModal from './components/DateRangeModal';
-import { dateBucket } from './utils/parser';
+import { getDateBounds, filterByRange } from './utils/parser';
 import './index.css';
 
 function App() {
@@ -21,25 +21,9 @@ function App() {
   }, [messages]);
 
   // First and last day present in the chat (bounds for the date picker)
-  const dateBounds = useMemo(() => {
-    let min = null, max = null;
-    messages.forEach(m => {
-      if (!m.parsedDate) return;
-      const b = dateBucket(m.parsedDate);
-      if (!min || b < min) min = b;
-      if (!max || b > max) max = b;
-    });
-    return min ? { min, max } : null;
-  }, [messages]);
+  const dateBounds = useMemo(() => getDateBounds(messages), [messages]);
 
-  const visibleMessages = useMemo(() => {
-    if (!dateRange) return messages;
-    return messages.filter(m => {
-      if (!m.parsedDate) return false;
-      const b = dateBucket(m.parsedDate);
-      return b >= dateRange.from && b <= dateRange.to;
-    });
-  }, [messages, dateRange]);
+  const visibleMessages = useMemo(() => filterByRange(messages, dateRange), [messages, dateRange]);
 
   const handleParsed = (parsedMessages, parsedMediaMap) => {
     setMessages(parsedMessages);

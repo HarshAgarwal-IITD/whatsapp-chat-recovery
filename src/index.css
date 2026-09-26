@@ -489,10 +489,58 @@ body {
   transition: opacity 0.15s;
 }
 .attachment-image .chat-image:hover { opacity: 0.9; }
-.attachment-image.expanded .chat-image {
-  max-height: 480px; object-fit: contain;
-  cursor: zoom-out; background: rgba(0,0,0,0.4);
+
+/* ─── Image lightbox ─────────────────────────────────────── */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.18s ease;
+  touch-action: pinch-zoom;
 }
+.lightbox-img {
+  max-width: 100%;
+  max-height: calc(100dvh - 140px);
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.lightbox-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex; align-items: center; gap: 12px;
+  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  background: linear-gradient(rgba(0,0,0,0.6), transparent);
+}
+.lightbox-info { flex: 1; min-width: 0; }
+.lightbox-sender { font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lightbox-meta { font-size: 0.75rem; color: var(--wa-text-sec); margin-top: 2px; }
+.lightbox-counter { font-size: 0.8rem; color: var(--wa-text-sec); flex-shrink: 0; }
+.lightbox-btn {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px;
+  border: none; border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.2s;
+}
+.lightbox-btn:hover, .lightbox-btn:active { background: rgba(255,255,255,0.2); }
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px; height: 48px;
+  background: rgba(0,0,0,0.5);
+}
+.lightbox-nav.prev { left: max(12px, env(safe-area-inset-left)); }
+.lightbox-nav.next { right: max(12px, env(safe-area-inset-right)); }
 
 .attachment-video .chat-video {
   display: block; max-width: 100%;
@@ -707,6 +755,7 @@ body {
   .wa-user-btn { padding: 6px 10px; }
   .wa-user-label { display: none; }
   .wa-icon-btn { width: 36px; height: 36px; }
+  .lightbox-nav { width: 42px; height: 42px; }
 
   .app-header { padding-top: max(14px, env(safe-area-inset-top)); }
 

@@ -68,6 +68,28 @@ export function dateBucket(date) {
   return `${y}-${m}-${d}`;
 }
 
+/** First and last day in the chat as { min, max } YYYY-MM-DD, or null if no dates parsed */
+export function getDateBounds(messages) {
+  let min = null, max = null;
+  messages.forEach(m => {
+    if (!m.parsedDate) return;
+    const b = dateBucket(m.parsedDate);
+    if (!min || b < min) min = b;
+    if (!max || b > max) max = b;
+  });
+  return min ? { min, max } : null;
+}
+
+/** Messages whose day falls within range ({ from, to } inclusive); all messages if range is null */
+export function filterByRange(messages, range) {
+  if (!range) return messages;
+  return messages.filter(m => {
+    if (!m.parsedDate) return false;
+    const b = dateBucket(m.parsedDate);
+    return b >= range.from && b <= range.to;
+  });
+}
+
 export function parseWhatsAppChat(text) {
   const lines = text.split('\n');
   const messages = [];

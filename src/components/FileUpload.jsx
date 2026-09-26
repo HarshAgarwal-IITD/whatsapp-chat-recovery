@@ -129,15 +129,15 @@ export default function FileUpload({ onParsed }) {
           <div className="btn-row">
             <label className="file-label" id="zip-upload-label">
               🗜 Upload ZIP
-              <input id="zip-input" type="file" accept=".zip" onChange={e => handleFiles(e.target.files)} className="file-input" />
+              <input id="zip-input" type="file" accept=".zip" onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} className="file-input" />
             </label>
             <label className="file-label" id="folder-upload-label">
               📁 Upload Folder
-              <input id="folder-input" type="file" webkitdirectory="true" directory="true" multiple onChange={e => handleFiles(e.target.files)} className="file-input" />
+              <input id="folder-input" type="file" webkitdirectory="true" directory="true" multiple onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} className="file-input" />
             </label>
             <label className="file-label secondary" id="file-upload-label">
               📄 .txt only
-              <input id="file-input" type="file" accept=".txt" onChange={e => handleFiles(e.target.files)} className="file-input" />
+              <input id="file-input" type="file" accept=".txt" onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} className="file-input" />
             </label>
           </div>
         </div>

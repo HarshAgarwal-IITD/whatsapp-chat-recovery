@@ -1,5 +1,6 @@
 import { memo, useMemo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { dateBucket, formatDateLabel } from '../utils/parser';
+import ImageLightbox from './ImageLightbox';
 
 const IMG_EXTS   = new Set(['jpg','jpeg','png','gif','webp']);
 const VIDEO_EXTS = new Set(['mp4','mov']);
@@ -20,8 +21,7 @@ function attachType(filename) {
   return 'file';
 }
 
-function MediaAttachment({ filename, mediaMap }) {
-  const [expanded, setExpanded] = useState(false);
+function MediaAttachment({ filename, mediaMap, onOpenImage }) {
   const url  = mediaMap[filename];
   const type = attachType(filename);
 
@@ -32,9 +32,9 @@ function MediaAttachment({ filename, mediaMap }) {
   );
 
   if (type === 'image') return (
-    <div className={`attachment attachment-image ${expanded ? 'expanded' : ''}`}>
+    <div className="attachment attachment-image">
       <img src={url} alt={filename} loading="lazy" decoding="async"
-        onClick={() => setExpanded(v => !v)} className="chat-image" />
+        onClick={() => onOpenImage(filename)} className="chat-image" />
     </div>
   );
 
@@ -77,7 +77,7 @@ function fmtIsoDate(iso) {
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const MessageRow = memo(function MessageRow({ msg, isPrimary, isLast, showName, mediaMap }) {
+const MessageRow = memo(function MessageRow({ msg, isPrimary, isLast, showName, mediaMap, onOpenImage }) {
   return (
     <div className={`message-wrapper ${isPrimary ? 'sent' : 'received'} ${isLast ? 'tail' : ''}`}>
       <div className="message-bubble">
@@ -87,7 +87,7 @@ const MessageRow = memo(function MessageRow({ msg, isPrimary, isLast, showName, 
           </div>
         )}
         {msg.attachment && (
-          <MediaAttachment filename={msg.attachment} mediaMap={mediaMap} />
+          <MediaAttachment filename={msg.attachment} mediaMap={mediaMap} onOpenImage={onOpenImage} />
         )}
         {msg.text && <div className="message-text">{msg.text}</div>}
         <div className="message-meta">
@@ -109,6 +109,7 @@ export default function ChatView({
   const prependRef  = useRef(null);   // { height, top } snapshot before loading older items
   const [visibleCount, setVisibleCount] = useState(PAGE);
   const [showJump, setShowJump] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
 
   // Senders come from the whole chat so the title doesn't change when filtering
   const uniqueSenders = senders;
@@ -147,6 +148,27 @@ export default function ChatView({
     });
     return items;
   }, [messages]);
+
+  // Every viewable image in the chat, in order — the lightbox navigates through these
+  const images = useMemo(() => {
+    const list = [];
+    messages.forEach(m => {
+      if (!m.attachment || !mediaMap[m.attachment] || attachType(m.attachment) !== 'image') return;
+      list.push({
+        url: mediaMap[m.attachment],
+        name: m.attachment,
+        sender: m.sender,
+        caption: `${formatDateLabel(m.parsedDate, m.date)} · ${fmtTime(m.time)}`,
+      });
+    });
+    return list;
+  }, [messages, mediaMap]);
+
+  const openImage = useCallback(filename => {
+    const i = images.findIndex(img => img.name === filename);
+    if (i !== -1) setLightboxIndex(i);
+  }, [images]);
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
 
   const start = Math.max(0, renderItems.length - visibleCount);
   const visibleItems = renderItems.slice(start);
@@ -282,11 +304,21 @@ export default function ChatView({
                 isLast={item.isLast}
                 showName={!isPrimary && item.isFirst && uniqueSenders.length > 1}
                 mediaMap={mediaMap}
+                onOpenImage={openImage}
               />
             );
           })}
         </div>
       </div>
+
+      {lightboxIndex !== null && (
+        <ImageLightbox
+          images={images}
+          index={lightboxIndex}
+          onIndexChange={setLightboxIndex}
+          onClose={closeLightbox}
+        />
+      )}
 
       {showJump && (
         <button className="jump-bottom-btn" onClick={jumpToBottom} aria-label="Scroll to latest message">
