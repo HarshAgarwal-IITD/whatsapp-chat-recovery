@@ -157,7 +157,7 @@ export default function FileUpload({ onParsed }) {
           <li>Open WhatsApp → tap the chat you want</li>
           <li>Tap ⋮ → <strong>More</strong> → <strong>Export Chat</strong></li>
           <li>Choose <strong>Include Media</strong></li>
-          <li>Save / AirDrop the <strong>.zip</strong> to your Mac and upload it here</li>
+          <li>Save the <strong>.zip</strong> to Files (phone) or your computer, then upload it here</li>
         </ol>
       </div>
     </div>

@@ -1,40 +1,45 @@
 /**
- * Parse a WhatsApp-style date string like "6/15/18", "15/06/2018", "15-06-18"
- * WhatsApp uses locale-dependent formats; we try both M/D/YY and D/M/YY and pick
- * the interpretation that produces a valid date.
- * Returns a Date object (midnight local time) or null.
+ * Robust WhatsApp date parser.
+ * Handles formats: M/D/YY, D/M/YY, M/D/YYYY, D/M/YYYY  (/ or - separator)
+ * Disambiguation rule:
+ *  - If one field is > 12 it must be the day
+ *  - Otherwise favour D/M (international) because WhatsApp's default locale is usually D/M
+ * Returns a Date (midnight local) or null.
  */
 export function parseWADate(dateStr) {
   if (!dateStr) return null;
-  const sep = dateStr.includes('-') ? '-' : '/';
+  const sep = /[-/]/.exec(dateStr)?.[0];
+  if (!sep) return null;
   const parts = dateStr.split(sep).map(Number);
-  if (parts.length !== 3) return null;
+  if (parts.length !== 3 || parts.some(isNaN)) return null;
 
   let [a, b, c] = parts;
-  // Normalize 2-digit year
   if (c < 100) c += c < 30 ? 2000 : 1900;
 
-  // Try M/D/YYYY first (common in US WhatsApp exports)
-  const tryMDY = new Date(c, a - 1, b);
-  if (tryMDY.getFullYear() === c && tryMDY.getMonth() === a - 1 && tryMDY.getDate() === b && a >= 1 && a <= 12 && b >= 1 && b <= 31) {
-    return tryMDY;
-  }
-  // Fallback: D/M/YYYY
-  const tryDMY = new Date(c, b - 1, a);
-  if (tryDMY.getFullYear() === c && tryDMY.getMonth() === b - 1 && tryDMY.getDate() === a && b >= 1 && b <= 12 && a >= 1 && a <= 31) {
-    return tryDMY;
-  }
-  return null;
+  const makeDate = (y, m, d) => {
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(y, m - 1, d);
+    return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d ? dt : null;
+  };
+
+  // If a > 12 → must be day (D/M/Y)
+  if (a > 12) return makeDate(c, b, a);
+  // If b > 12 → must be month first (M/D/Y)
+  if (b > 12) return makeDate(c, a, b);
+  // Ambiguous: prefer D/M (international WhatsApp default)
+  return makeDate(c, b, a) || makeDate(c, a, b);
 }
 
 /**
- * Format a Date into a WhatsApp-style date separator label:
- *  - "Today" / "Yesterday"
- *  - Day name for messages within the last 7 days (e.g. "Monday")
- *  - "DD Month YYYY" for older messages
+ * Format a Date into a WhatsApp-style date separator label.
+ * Falls back to the raw string if parsing failed.
  */
-export function formatDateLabel(date) {
-  if (!date) return null;
+export function formatDateLabel(date, rawDate) {
+  if (!date) {
+    // prettify raw string like "6/15/18" → "15 Jun 18" if possible, else return as-is
+    return rawDate || 'Unknown date';
+  }
+
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -42,17 +47,25 @@ export function formatDateLabel(date) {
 
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return date.toLocaleDateString('en-US', { weekday: 'long' });
+  if (diffDays < 7) {
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+  }
 
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  // Show full date: "15 June 2018"
+  return date.toLocaleDateString('en-GB', {
+    day:   'numeric',
+    month: 'long',
+    year:  'numeric',
+  });
 }
 
-/**
- * Returns a string key "YYYY-MM-DD" used to group messages by day.
- */
+/** YYYY-MM-DD bucket key for grouping messages by day */
 export function dateBucket(date) {
   if (!date) return 'unknown';
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 export function parseWhatsAppChat(text) {
@@ -60,12 +73,10 @@ export function parseWhatsAppChat(text) {
   const messages = [];
   let currentMsg = null;
 
-  // Matches: [D/M/YY, HH:MM:SS AM/PM] Sender: text  OR  D/M/YY, HH:MM - Sender: text
-  const msgRegex = /^\[?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})[, ]\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[\s\u202F\u00A0]?[aApP][mM])?)\]?\s*(?:-\s*)?([^:]+?):\s*(.*)/;
-  const sysRegex = /^\[?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})[, ]\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[\s\u202F\u00A0]?[aApP][mM])?)\]?\s*(.*)/;
+  const msgRegex = /^\[?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})[,، ]\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[\s\u202F\u00A0]?[aApP][mM])?)\]?\s*(?:-\s*)?([^:]+?):\s*(.*)/;
+  const sysRegex = /^\[?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})[,، ]\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[\s\u202F\u00A0]?[aApP][mM])?)\]?\s*(.*)/;
 
-  // Matches "<attached: filename>" or "filename (file attached)"
-  const attachedRegex = /^[‎\s]*<attached:\s*(.+?)>$/i;
+  const attachedRegex  = /^[‎\s]*<attached:\s*(.+?)>$/i;
   const attachedRegex2 = /^[‎\s]*(.+?)\s*\(file attached\)$/i;
 
   for (let line of lines) {
@@ -85,7 +96,7 @@ export function parseWhatsAppChat(text) {
         sender: match[3].trim(),
         text: attachedMatch ? null : rawText,
         attachment: attachedMatch ? attachedMatch[1].trim() : null,
-        isSystem: false
+        isSystem: false,
       };
       continue;
     }
@@ -99,7 +110,7 @@ export function parseWhatsAppChat(text) {
         date: sysMatch[1],
         parsedDate,
         time: sysMatch[2],
-        text: sysMatch[3]
+        text: sysMatch[3],
       });
       continue;
     }
