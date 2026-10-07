@@ -746,6 +746,18 @@ body {
 .range-apply-btn:active { filter: brightness(0.9); }
 .range-apply-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ─── Export modal ───────────────────────────────────────── */
+.export-icon { font-size: 1.5rem; line-height: 1; flex-shrink: 0; width: 40px; text-align: center; }
+.export-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.export-desc { font-size: 0.75rem; color: var(--wa-text-sec); }
+.export-option {
+  display: flex; align-items: center; gap: 8px;
+  align-self: flex-start;
+  font-size: 0.85rem; color: var(--wa-text);
+  cursor: pointer;
+}
+.export-option input { width: 18px; height: 18px; accent-color: var(--wa-green); }
+
 /* ─── Animations ─────────────────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }

@@ -1,6 +1,7 @@
 import { memo, useMemo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { dateBucket, formatDateLabel } from '../utils/parser';
 import MediaLightbox from './MediaLightbox';
+import ExportModal from './ExportModal';
 
 const IMG_EXTS   = new Set(['jpg','jpeg','png','gif','webp']);
 const VIDEO_EXTS = new Set(['mp4','mov']);
@@ -114,6 +115,7 @@ export default function ChatView({
   const [visibleCount, setVisibleCount] = useState(PAGE);
   const [showJump, setShowJump] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [showExport, setShowExport] = useState(false);
 
   // Senders come from the whole chat so the title doesn't change when filtering
   const uniqueSenders = senders;
@@ -258,6 +260,18 @@ export default function ChatView({
             </svg>
           </button>
         )}
+        <button
+          className="wa-icon-btn"
+          onClick={() => setShowExport(true)}
+          aria-label="Export chat"
+          title="Export chat"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </button>
         <button className="wa-user-btn" onClick={onChangeUser} title="Change who you are">
           <span className="wa-user-label">You:</span>
           <span className="wa-user-name">{primaryUser || 'Not set'}</span>
@@ -324,6 +338,17 @@ export default function ChatView({
           index={lightboxIndex}
           onIndexChange={setLightboxIndex}
           onClose={closeLightbox}
+        />
+      )}
+
+      {showExport && (
+        <ExportModal
+          messages={messages}
+          mediaMap={mediaMap}
+          chatName={chatName}
+          primaryUser={primaryUser}
+          dateRange={dateRange}
+          onClose={() => setShowExport(false)}
         />
       )}
 
