@@ -20,7 +20,7 @@ Personal site: the owner uploads WhatsApp export ZIPs; their father logs in with
 - `functions/_lib/` — shared helpers (auth/cookie HMAC, JSON responses + validation, index.json store). Not routed.
 - `src/utils/api.js` — the single frontend client and the API contract (shapes documented at the top). Keep backend and this file in sync.
 - `src/App.jsx` — auth state, `/upload` vs list routing (pathname + history), opening chats.
-- `src/components/` — `Login`, `ChatList`, `RenameModal` (tap the chat name in the header), `ChatView` (virtualised-ish paging, don't break its scroll logic), `Upload` (owner's page), plus modals/lightbox. `FileUpload` is the old local-only uploader, no longer used by App.
+- `src/components/` — `Login`, `ChatList`, `RenameModal` (tap the chat name in the header), `ChatView` (shows one page of `PAGE_SIZE`=100 messages, newest page first, with Older/Newer buttons — replaced infinite scroll, which lagged on long chats; keep the DOM bounded), `Upload` (owner's page), plus modals/lightbox. `FileUpload` is the old local-only uploader, no longer used by App.
 - `src/utils/parser.js` (WhatsApp transcript parsing), `src/utils/zip.js` (ZIP helpers + upload metadata), `src/utils/exporter.js`.
 
 ## R2 layout

@@ -7,11 +7,10 @@ const IMG_EXTS   = new Set(['jpg','jpeg','png','gif','webp']);
 const VIDEO_EXTS = new Set(['mp4','mov']);
 const AUDIO_EXTS = new Set(['opus','ogg','mp3','aac','m4a']);
 
-// Only the newest PAGE items are mounted at first; older ones are
-// prepended in PAGE-sized chunks as the user scrolls up.
-const PAGE = 200;
-const LOAD_MORE_THRESHOLD = 1200; // px from top at which older messages load
-const STICK_THRESHOLD     = 120;  // px from bottom that counts as "at bottom"
+// The chat is shown one page of PAGE_SIZE messages at a time (newest page first), so the
+// DOM stays small however long the chat is; buttons at either end switch pages.
+const PAGE_SIZE       = 100;
+const STICK_THRESHOLD = 120;  // px from bottom that counts as "at bottom"
 
 function attachType(filename) {
   if (!filename) return null;
@@ -112,8 +111,10 @@ export default function ChatView({
   const scrollRef   = useRef(null);
   const contentRef  = useRef(null);
   const stickRef    = useRef(true);   // pinned to bottom?
-  const prependRef  = useRef(null);   // { height, top } snapshot before loading older items
-  const [visibleCount, setVisibleCount] = useState(PAGE);
+  const landRef     = useRef('bottom'); // where to put the viewport after a page change
+  const pageCount   = Math.max(1, Math.ceil(messages.length / PAGE_SIZE));
+  const lastPage    = pageCount - 1;
+  const [page, setPage] = useState(lastPage);
   const [showJump, setShowJump] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [showExport, setShowExport] = useState(false);
@@ -133,12 +134,14 @@ export default function ChatView({
   const mediaCount = Object.keys(mediaMap).length;
   const msgCount   = useMemo(() => messages.filter(m => !m.isSystem).length, [messages]);
 
-  // Flatten into render items (date separators + messages) with grouping info
-  // precomputed in a single O(n) pass.
+  // Flatten the current page into render items (date separators + messages) with grouping
+  // info precomputed in a single O(n) pass. Each page opens with its date separator.
   const renderItems = useMemo(() => {
     const items = [];
     let lastBucket = null;
-    messages.forEach((msg, idx) => {
+    const offset = page * PAGE_SIZE;
+    messages.slice(offset, offset + PAGE_SIZE).forEach((msg, i) => {
+      const idx = offset + i;
       const bucket = dateBucket(msg.parsedDate);
       if (bucket !== lastBucket) {
         items.push({ type: 'date', label: formatDateLabel(msg.parsedDate, msg.date), key: `d-${idx}` });
@@ -156,7 +159,7 @@ export default function ChatView({
       item.isLast  = !sameSender(next);
     });
     return items;
-  }, [messages]);
+  }, [messages, page]);
 
   // Every viewable image and video in the chat, in order — the lightbox navigates through these
   const mediaItems = useMemo(() => {
@@ -182,24 +185,21 @@ export default function ChatView({
   }, [mediaItems]);
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
 
-  const start = Math.max(0, renderItems.length - visibleCount);
-  const visibleItems = renderItems.slice(start);
-  const hasMore = start > 0;
-
-  // Start at the bottom
+  // Going to an older page lands at its bottom (reading continues upwards), a newer page at
+  // its top; the first render lands at the bottom of the newest page
   useLayoutEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, []);
+    if (!el) return;
+    const bottom = landRef.current === 'bottom';
+    el.scrollTop = bottom ? el.scrollHeight : 0;
+    stickRef.current = bottom;
+    setShowJump(page < lastPage);
+  }, [page, lastPage]);
 
-  // After older items are prepended, keep the viewport on the same message
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    const snap = prependRef.current;
-    if (!el || !snap) return;
-    el.scrollTop = snap.top + (el.scrollHeight - snap.height);
-    prependRef.current = null;
-  }, [visibleCount]);
+  const goToPage = (next, land) => {
+    landRef.current = land;
+    setPage(next);
+  };
 
   // Stay pinned to the bottom while media above finishes loading
   useEffect(() => {
@@ -207,7 +207,7 @@ export default function ChatView({
     const el = scrollRef.current;
     if (!content || !el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => {
-      if (stickRef.current && !prependRef.current) el.scrollTop = el.scrollHeight;
+      if (stickRef.current) el.scrollTop = el.scrollHeight;
     });
     ro.observe(content);
     return () => ro.disconnect();
@@ -218,15 +218,11 @@ export default function ChatView({
     if (!el) return;
     const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     stickRef.current = fromBottom < STICK_THRESHOLD;
-    setShowJump(fromBottom > 600);
-
-    if (hasMore && !prependRef.current && el.scrollTop < LOAD_MORE_THRESHOLD) {
-      prependRef.current = { height: el.scrollHeight, top: el.scrollTop };
-      setVisibleCount(c => c + PAGE);
-    }
-  }, [hasMore]);
+    setShowJump(page < lastPage || fromBottom > 600);
+  }, [page, lastPage]);
 
   const jumpToBottom = () => {
+    if (page < lastPage) { goToPage(lastPage, 'bottom'); return; }
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   };
@@ -322,8 +318,13 @@ export default function ChatView({
       {/* Messages */}
       <div className="chat-messages-container" ref={scrollRef} onScroll={onScroll}>
         <div className="chat-messages-scroll-area" ref={contentRef}>
-          {hasMore && <div className="load-more-hint">Loading older messages…</div>}
-          {visibleItems.map(item => {
+          {page > 0 && (
+            <div className="page-nav">
+              <button className="page-nav-btn" onClick={() => goToPage(page - 1, 'bottom')}>↑ Older messages</button>
+              <span className="page-nav-label">Page {page + 1} of {pageCount}</span>
+            </div>
+          )}
+          {renderItems.map(item => {
             if (item.type === 'date') {
               return (
                 <div key={item.key} className="date-separator">
@@ -354,6 +355,12 @@ export default function ChatView({
               />
             );
           })}
+          {page < lastPage && (
+            <div className="page-nav">
+              <span className="page-nav-label">Page {page + 1} of {pageCount}</span>
+              <button className="page-nav-btn" onClick={() => goToPage(page + 1, 'top')}>Newer messages ↓</button>
+            </div>
+          )}
         </div>
       </div>
 

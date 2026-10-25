@@ -318,12 +318,24 @@ body {
 .chat-messages-container::-webkit-scrollbar-track { background: transparent; }
 .chat-messages-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
 
-.load-more-hint {
-  text-align: center;
-  font-size: 0.72rem;
-  color: var(--wa-text-sec);
-  padding: 10px 0;
+/* Older / newer page buttons at either end of the messages */
+.page-nav {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 0;
 }
+.page-nav-btn {
+  min-height: 44px;
+  padding: 10px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: var(--wa-header);
+  color: var(--wa-green);
+  font-family: inherit; font-size: 0.95rem; font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.page-nav-btn:active { filter: brightness(1.2); }
+.page-nav-label { font-size: 0.72rem; color: var(--wa-text-sec); }
 
 .jump-bottom-btn {
   position: absolute;
