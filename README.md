@@ -1,16 +1,44 @@
-# React + Vite
+# WhatsApp Chat Viewer
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A private website for reading exported WhatsApp chats, built to look and feel like WhatsApp on a phone.
 
-Currently, two official plugins are available:
+- Upload a WhatsApp export (`.zip` with media) at `/upload`; it's unzipped in your browser and stored in Cloudflare R2.
+- Log in with one shared ID/password and pick a chat from the list to read it, with photos, videos, voice notes, date filtering and export to PDF/HTML/text.
+- Works as a home-screen app on iPhone/Android ("Add to Home Screen").
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+**Live:** https://whatsapp-chats-cdx.pages.dev
 
-## React Compiler
+## How it's hosted
+Everything runs on Cloudflare (free tier):
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Part | Service |
+|---|---|
+| Frontend (React + Vite, `dist/`) | Cloudflare Pages, project `whatsapp-chats` |
+| Backend API (`functions/`) | Cloudflare Pages Functions |
+| Chats and media | Cloudflare R2 bucket `whatsapp-chats` |
+| Login ID, password, cookie key | Pages secrets `APP_USERNAME`, `APP_PASSWORD`, `SESSION_SECRET` |
 
-## Expanding the Oxlint configuration
+## Develop
+```sh
+npm install
+# local secrets for testing (gitignored)
+printf 'APP_USERNAME=papa\nAPP_PASSWORD=test123\nSESSION_SECRET=%s\n' "$(openssl rand -hex 32)" > .dev.vars
+npm run pages:dev        # full app at http://localhost:8788
+npm run lint && node test_parser.js
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Deploy
+```sh
+npx wrangler login       # once
+npm run deploy           # builds and uploads frontend + functions
+```
+
+Change the login:
+```sh
+npx wrangler pages secret put APP_PASSWORD --project-name whatsapp-chats
+npm run deploy           # secrets apply on the next deployment
+```
+
+## Limits
+- Single media files over 95 MB are skipped on upload (Pages Functions 100 MB request limit).
+- R2 free tier: 10 GB storage, then about $0.015/GB-month.
