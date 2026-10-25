@@ -1,27 +1,7 @@
 import { useState, useCallback } from 'react';
 import JSZip from 'jszip';
 import { parseWhatsAppChat } from '../utils/parser';
-
-const baseName = path => path.split('/').pop();
-
-// macOS-zipped exports carry "__MACOSX/._name" resource forks that look like real files
-const isJunk = path => path.startsWith('__MACOSX/') || path.includes('/__MACOSX/') || baseName(path).startsWith('._') || baseName(path) === '.DS_Store';
-
-/** Pick the chat transcript: "_chat.txt" (iOS), "WhatsApp Chat with …txt" (Android), else the largest .txt */
-function pickChatFile(candidates, getPath, getSize) {
-  const txts = candidates.filter(c => !isJunk(getPath(c)) && /\.txt$/i.test(getPath(c)));
-  return txts.find(c => baseName(getPath(c)) === '_chat.txt')
-    || txts.find(c => /^whatsapp chat/i.test(baseName(getPath(c))))
-    || txts.sort((a, b) => getSize(b) - getSize(a))[0];
-}
-
-/** Decode the transcript, handling UTF-8 (with or without BOM) and UTF-16 exports */
-function decodeText(buffer) {
-  const bytes = new Uint8Array(buffer);
-  if (bytes[0] === 0xFF && bytes[1] === 0xFE) return new TextDecoder('utf-16le').decode(bytes);
-  if (bytes[0] === 0xFE && bytes[1] === 0xFF) return new TextDecoder('utf-16be').decode(bytes);
-  return new TextDecoder('utf-8').decode(bytes);
-}
+import { baseName, isJunk, pickChatFile, decodeText } from '../utils/zip';
 
 async function processZip(file, setProgress) {
   setProgress('Reading ZIP…');

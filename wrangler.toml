@@ -1,0 +1,7 @@
+name = "whatsapp-chats"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-09-01"
+
+[[r2_buckets]]
+binding = "CHATS"
+bucket_name = "whatsapp-chats"
