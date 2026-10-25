@@ -34,8 +34,9 @@ async function readZip(file) {
   const txt = pickChatFile(entries, f => f.name, f => f._data?.uncompressedSize ?? 0);
   if (!txt) throw new Error('No chat .txt file found inside the ZIP.');
   const text = decodeText(await txt.async('arraybuffer'));
+  // NFC so names match the transcript (macOS stores "é" as "e" + combining accent)
   const items = entries.filter(f => f !== txt).map(entry => ({
-    name: baseName(entry.name),
+    name: baseName(entry.name).normalize('NFC'),
     size: entry._data?.uncompressedSize ?? 0,
     getBlob: () => entry.async('blob'), // read lazily, right before upload
   }));
@@ -49,7 +50,7 @@ async function readFolder(fileList) {
   const text = decodeText(await txt.arrayBuffer());
   const folder = (txt.webkitRelativePath || '').split('/')[0];
   const items = files.filter(f => f !== txt).map(f => ({
-    name: f.name,
+    name: f.name.normalize('NFC'),
     size: f.size,
     getBlob: async () => f,
   }));

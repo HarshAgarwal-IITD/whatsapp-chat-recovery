@@ -107,6 +107,7 @@ const MessageRow = memo(function MessageRow({ msg, isPrimary, isLast, showName, 
 export default function ChatView({
   messages, senders, primaryUser, mediaMap = {},
   dateRange, onOpenDateRange, onClearDateRange, onChangeUser, onBack,
+  title, onRename,
 }) {
   const scrollRef   = useRef(null);
   const contentRef  = useRef(null);
@@ -120,12 +121,14 @@ export default function ChatView({
   // Senders come from the whole chat so the title doesn't change when filtering
   const uniqueSenders = senders;
 
+  // Saved chat name wins; otherwise name the chat after the other participants
   const chatName = useMemo(() => {
+    if (title) return title;
     const others = uniqueSenders.filter(s => s !== primaryUser);
     if (!others.length) return uniqueSenders[0] || 'Chat';
     if (others.length === 1) return others[0];
     return `${others[0]} +${others.length - 1}`;
-  }, [uniqueSenders, primaryUser]);
+  }, [title, uniqueSenders, primaryUser]);
 
   const mediaCount = Object.keys(mediaMap).length;
   const msgCount   = useMemo(() => messages.filter(m => !m.isSystem).length, [messages]);
@@ -228,6 +231,24 @@ export default function ChatView({
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   };
 
+  const headerInfo = (
+    <>
+      <div className="wa-contact-name">
+        <span className="wa-contact-name-text">{chatName}</span>
+        {onRename && (
+          <svg className="wa-rename-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          </svg>
+        )}
+      </div>
+      <div className="wa-contact-sub">
+        {msgCount.toLocaleString()} msgs
+        {mediaCount > 0 && ` · ${mediaCount.toLocaleString()} media`}
+      </div>
+    </>
+  );
+
   return (
     <div className="chat-view">
       {/* WA-style header */}
@@ -238,13 +259,13 @@ export default function ChatView({
           </svg>
         </button>
         <div className="wa-avatar">{chatName.charAt(0).toUpperCase()}</div>
-        <div className="wa-header-info">
-          <div className="wa-contact-name">{chatName}</div>
-          <div className="wa-contact-sub">
-            {msgCount.toLocaleString()} msgs
-            {mediaCount > 0 && ` · ${mediaCount.toLocaleString()} media`}
-          </div>
-        </div>
+        {onRename ? (
+          <button className="wa-header-info wa-header-info-btn" onClick={onRename} title="Rename chat" aria-label={`${chatName}. Rename chat`}>
+            {headerInfo}
+          </button>
+        ) : (
+          <div className="wa-header-info">{headerInfo}</div>
+        )}
         {onOpenDateRange && (
           <button
             className={`wa-icon-btn ${dateRange ? 'active' : ''}`}

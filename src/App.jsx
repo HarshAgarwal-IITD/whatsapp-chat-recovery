@@ -5,9 +5,10 @@ import Login from './components/Login';
 import Upload from './components/Upload';
 import UserSelectModal from './components/UserSelectModal';
 import DateRangeModal from './components/DateRangeModal';
+import RenameModal from './components/RenameModal';
 import { parseWhatsAppChat, getDateBounds, filterByRange } from './utils/parser';
 import {
-  listChats, getChat, getChatText, buildMediaMap, logout, UnauthorizedError,
+  listChats, getChat, getChatText, buildMediaMap, logout, renameChat, UnauthorizedError,
 } from './utils/api';
 import './index.css';
 import './App.css';
@@ -27,6 +28,7 @@ function App() {
   const [showModal, setShowModal]   = useState(false);
   const [dateRange, setDateRange]   = useState(null);   // { from, to } as YYYY-MM-DD
   const [showDateModal, setShowDateModal] = useState(false);
+  const [showRename, setShowRename] = useState(false);
 
   const requestRef = useRef(0);      // ignores responses for chats that are no longer open
   const chatsRef = useRef(chats);
@@ -41,6 +43,7 @@ function App() {
     setShowModal(false);
     setDateRange(null);
     setShowDateModal(false);
+    setShowRename(false);
   }, []);
 
   /** Returns true if the error was a 401 (and the login screen is now showing) */
@@ -145,6 +148,21 @@ function App() {
     setChats(EMPTY);
     setAuth('login');
   }, [resetChat]);
+
+  /** Saves the new name, then updates the open chat and its list row in place */
+  const handleRename = useCallback(async (name, password) => {
+    const id = active.id;
+    let summary;
+    try {
+      summary = await renameChat(id, name, password);
+    } catch (e) {
+      if (handleAuthError(e)) return;
+      throw e;   // RenameModal shows the message (e.g. "Wrong password")
+    }
+    setActive(a => (a?.id === id ? { ...a, name: summary.name } : a));
+    setChats(list => list.map(c => (c.id === id ? { ...c, name: summary.name } : c)));
+    setShowRename(false);
+  }, [active, handleAuthError]);
 
   const handleUploadDone = useCallback(() => {
     navigate('/');
@@ -253,6 +271,8 @@ function App() {
               primaryUser={primaryUser}
               onChangeUser={() => setShowModal(true)}
               onBack={closeChat}
+              title={active.name}
+              onRename={() => setShowRename(true)}
             />
           )}
         </section>
@@ -264,6 +284,14 @@ function App() {
           current={primaryUser}
           onSelect={user => { setPrimaryUser(user); setShowModal(false); }}
           onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {showRename && active && (
+        <RenameModal
+          name={active.name}
+          onSave={handleRename}
+          onClose={() => setShowRename(false)}
         />
       )}
 

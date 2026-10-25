@@ -1,10 +1,11 @@
 // Helpers for reading WhatsApp exports (ZIP or folder) in the browser,
 // shared by the local viewer (FileUpload) and the hosted upload page (Upload).
 
-export const baseName = path => path.split('/').pop();
+// Some Windows zip tools write "\" as the folder separator
+export const baseName = path => path.split(/[\\/]/).pop();
 
 // macOS-zipped exports carry "__MACOSX/._name" resource forks that look like real files
-export const isJunk = path => path.startsWith('__MACOSX/') || path.includes('/__MACOSX/') || baseName(path).startsWith('._') || baseName(path) === '.DS_Store';
+export const isJunk = path => /(?:^|[\\/])__MACOSX[\\/]/.test(path) || baseName(path).startsWith('._') || baseName(path) === '.DS_Store';
 
 /** Pick the chat transcript: "_chat.txt" (iOS), "WhatsApp Chat with …txt" (Android), else the largest .txt */
 export function pickChatFile(candidates, getPath, getSize) {

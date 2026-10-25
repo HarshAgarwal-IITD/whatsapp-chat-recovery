@@ -16,11 +16,11 @@ Personal site: the owner uploads WhatsApp export ZIPs; their father logs in with
 
 ## Layout
 - `functions/api/_middleware.js` — every `/api/*` except `/api/login` requires the signed `session` cookie.
-- `functions/api/login.js`, `logout.js`; `functions/api/chats/index.js` (list), `chats/[id]/index.js` (meta GET, DELETE), `chats/[id]/text.js`, `chats/[id]/meta.js`, `chats/[id]/media/[name].js` (GET/HEAD with Range, PUT).
+- `functions/api/login.js`, `logout.js`; `functions/api/chats/index.js` (list), `chats/[id]/index.js` (meta GET, PATCH rename — re-checks `APP_PASSWORD`, wrong password is 403 not 401 so the viewer isn't logged out — and DELETE), `chats/[id]/text.js`, `chats/[id]/meta.js`, `chats/[id]/media/[name].js` (GET/HEAD with Range, PUT).
 - `functions/_lib/` — shared helpers (auth/cookie HMAC, JSON responses + validation, index.json store). Not routed.
 - `src/utils/api.js` — the single frontend client and the API contract (shapes documented at the top). Keep backend and this file in sync.
 - `src/App.jsx` — auth state, `/upload` vs list routing (pathname + history), opening chats.
-- `src/components/` — `Login`, `ChatList`, `ChatView` (virtualised-ish paging, don't break its scroll logic), `Upload` (owner's page), plus modals/lightbox. `FileUpload` is the old local-only uploader, no longer used by App.
+- `src/components/` — `Login`, `ChatList`, `RenameModal` (tap the chat name in the header), `ChatView` (virtualised-ish paging, don't break its scroll logic), `Upload` (owner's page), plus modals/lightbox. `FileUpload` is the old local-only uploader, no longer used by App.
 - `src/utils/parser.js` (WhatsApp transcript parsing), `src/utils/zip.js` (ZIP helpers + upload metadata), `src/utils/exporter.js`.
 
 ## R2 layout
@@ -28,8 +28,11 @@ Personal site: the owner uploads WhatsApp export ZIPs; their father logs in with
 
 ## Gotchas
 - Pages Functions request bodies are capped at 100 MB: Upload skips files > 95 MB.
-- `index.json` is read-modify-write with no locking; fine for one uploader.
+- `index.json` writes go through `updateIndex` (R2 `etagMatches` precondition + jittered retry) so concurrent upload/rename/delete can't drop entries; `meta.json` per chat is the source of truth.
+- The stored `chat.txt` is the full decoded transcript and is re-parsed on every view, so parser fixes apply to already-uploaded chats.
+- Data-integrity rules the parser must keep (covered in `test_parser.js`): never strip ZWJ/ZWNJ (emoji sequences, Hindi); only lines matching the export's own header shape (bracket/separator) start a new message; attachment names and media-map keys are NFC.
 - One shared login for viewing and uploading by design (owner chose not to have a separate upload password). Keep the "Upload a chat" menu item.
+- ChatView shows the saved chat name via its `title` prop; ExportModal uses the same name for the PDF/HTML/text file.
 - Mobile is the primary target: keep 100dvh layout, safe-area insets, ≥44px tap targets, 16px inputs, no horizontal scroll at 360px.
 - `.env` holds the owner's personal notes and is gitignored — never commit or print it.
 - The Chrome extension may not be connected; headless checks work with puppeteer-core pointed at `/Applications/Google Chrome.app` (install it in a scratch dir, not the project).

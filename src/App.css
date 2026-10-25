@@ -436,3 +436,18 @@
 @media (max-width: 340px) {
   .wa-header .wa-avatar { display: none; }
 }
+
+/* ─── Rename chat ─────────────────────────────────────────── */
+.wa-header-info-btn {
+  display: block;
+  text-align: left;
+  background: none; border: none; padding: 4px 0;
+  color: inherit; font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  min-height: 44px;
+}
+.wa-header-info-btn .wa-contact-name { display: flex; align-items: center; gap: 6px; }
+.wa-rename-icon { flex-shrink: 0; color: var(--wa-text-sec); }
+.rename-field { flex: none; width: 100%; font-size: 0.85rem; }
+.wa-contact-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

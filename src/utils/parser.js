@@ -126,14 +126,16 @@ export function filterByRange(messages, range) {
 }
 
 
-// Direction / zero-width marks WhatsApp sprinkles into exports (LRM, RLM, bidi embeddings, BOM)
-const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+// Direction / zero-width marks WhatsApp sprinkles into exports (ZWSP, LRM, RLM, bidi embeddings, BOM).
+// ZWNJ/ZWJ (U+200C/D) are kept: they're part of emoji sequences (👨‍👩‍👧) and Indic scripts.
+const INVISIBLE = /[\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 
 const DATE = String.raw`\d{1,4}[./-]\d{1,2}[./-]\d{1,4}\.?`;
 const TIME = String.raw`\d{1,2}[:.]\d{2}(?:[:.]\d{2})?(?:\s*(?:[aApP]\.?\s?[mM]\.?|上午|下午|午前|午後))?`;
 // iOS:     "[15/06/18, 9:26:35 PM] Name: text"
 // Android: "15/06/2018, 21:26 - Name: text"
-const HEADER = new RegExp(String.raw`^\[?(${DATE})[,،]?\s+(${TIME})\]?\s*(?:[-–~]\s*)?(.*)$`);
+// Groups: opening bracket, date, time, separator, rest
+const HEADER = new RegExp(String.raw`^(\[)?(${DATE})[,،]?\s+(${TIME})\]?\s*(?:([-–~])\s*)?(.*)$`);
 const SENDER = /^(.+?):(?:\s+|$)(.*)$/;
 
 // A "sender" containing one of these is really a system line that happens to contain ": "
@@ -160,13 +162,13 @@ function splitAttachment(text) {
   const inline = text.match(ATTACHED_INLINE);
   if (inline) {
     const caption = (text.slice(0, inline.index) + text.slice(inline.index + inline[0].length)).trim();
-    return { attachment: inline[1], text: caption || null };
+    return { attachment: inline[1].normalize('NFC'), text: caption || null };
   }
   const [first, ...rest] = text.split('\n');
   const android = first.trim().match(ATTACHED_ANDROID);
   if (android) {
     const caption = rest.join('\n').trim();
-    return { attachment: android[1], text: caption || null };
+    return { attachment: android[1].normalize('NFC'), text: caption || null };
   }
   return { attachment: null, text: text || null };
 }
@@ -185,10 +187,14 @@ export function parseWhatsAppChat(text) {
   const lines = text.replace(/^\uFEFF/, '').split(/\r\n|\r|\n|\u2028/);
   const messages = [];
   let current = null;
+  // Bracket/separator shape of the export's first header. A whole export uses one shape, so a
+  // line inside a message that merely starts with a date ("12.05.2024 10:00 meeting") stays put.
+  let shape = null;
 
   for (const raw of lines) {
     const line = raw.replace(INVISIBLE, '');
-    const header = line.trim().match(HEADER);
+    let header = line.trim().match(HEADER);
+    if (header && shape && (!!header[1] !== shape.bracket || !!header[4] !== shape.sep)) header = null;
 
     if (!header) {
       // Continuation of a multi-line message; keep blank lines and indentation
@@ -196,20 +202,40 @@ export function parseWhatsAppChat(text) {
       continue;
     }
 
-    if (current) messages.push(finalize(current));
-    const [, date, time, rest] = header;
+    shape ??= { bracket: !!header[1], sep: !!header[4] };
+    if (current) messages.push(current);
+    const [, , date, time, , rest] = header;
     const base = { date, parsedDate: null, time: normalizeTime(time) };
     const sender = rest.match(SENDER);
 
-    if (!sender || SYSTEM_IN_SENDER.test(' ' + sender[1])) {
+    if (!sender) {
       current = { ...base, isSystem: true, lines: [rest] };
+    } else if (SYSTEM_IN_SENDER.test(' ' + sender[1])) {
+      // Probably an event like `Alice changed the subject to "Trip: Goa"`; resolved below
+      current = { ...base, isSystem: true, lines: [rest], maybeSender: sender[1].trim(), maybeText: sender[2] };
     } else if (/:\s*[\u200E\u200F]/.test(raw) && SYSTEM_TEXT.test(sender[2])) {
       current = { ...base, isSystem: true, lines: [sender[2]] };
     } else {
       current = { ...base, isSystem: false, sender: sender[1].trim(), lines: [sender[2]] };
     }
   }
-  if (current) messages.push(finalize(current));
+  if (current) messages.push(current);
+
+  // A contact whose name contains an event word ("Mom Left") is a real sender if they also
+  // sent ordinary messages, or the same "sender" recurs without quotes (a repeated
+  // subject change like `Alice changed the subject to "Trip: …"` always has a quote).
+  const senders = new Set(messages.filter(m => !m.isSystem).map(m => m.sender));
+  const seen = new Map();
+  messages.forEach(m => { if (m.maybeSender) seen.set(m.maybeSender, (seen.get(m.maybeSender) || 0) + 1); });
+  for (const m of messages) {
+    if (m.maybeSender && (senders.has(m.maybeSender) || (seen.get(m.maybeSender) >= 2 && !/["“”]/.test(m.maybeSender)))) {
+      Object.assign(m, { isSystem: false, sender: m.maybeSender });
+      m.lines[0] = m.maybeText;
+    }
+    delete m.maybeSender;
+    delete m.maybeText;
+    finalize(m);
+  }
 
   // Resolve dates once the whole export's date order is known
   const order = detectDateOrder(messages.map(m => m.date));

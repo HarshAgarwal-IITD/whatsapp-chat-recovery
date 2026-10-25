@@ -67,9 +67,14 @@ export function mediaUrl(id, name) {
   return `${chatPath(id)}/media/${encodeURIComponent(name)}`;
 }
 
-/** { [fileName]: url } in the shape ChatView expects */
+/** { [fileName]: url } in the shape ChatView expects (keys NFC, like the parser's attachment names) */
 export function buildMediaMap(id, names) {
-  return Object.fromEntries(names.map(n => [n, mediaUrl(id, n)]));
+  return Object.fromEntries(names.map(n => [n.normalize('NFC'), mediaUrl(id, n)]));
+}
+
+/** Rename a chat (the server re-checks the password). Resolves to the updated ChatSummary; throws "Wrong password" on a bad password */
+export async function renameChat(id, name, password) {
+  return (await json(chatPath(id), 'PATCH', { name, password })).json();
 }
 
 export async function deleteChat(id) {

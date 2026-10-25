@@ -1,5 +1,5 @@
 import { chatKey, error, json, validId } from '../../../_lib/http.js';
-import { readIndex, writeIndex } from '../../../_lib/store.js';
+import { updateIndex } from '../../../_lib/store.js';
 
 // Body: ChatMeta without id/uploadedAt. Writes meta.json and upserts the summary into index.json.
 export async function onRequestPut({ params, env, request }) {
@@ -21,8 +21,6 @@ export async function onRequestPut({ params, env, request }) {
   await env.CHATS.put(chatKey(id, 'meta.json'), JSON.stringify(meta), {
     httpMetadata: { contentType: 'application/json' },
   });
-  const list = (await readIndex(env.CHATS)).filter(c => c.id !== id);
-  list.push(summary);
-  await writeIndex(env.CHATS, list);
+  await updateIndex(env.CHATS, list => [...list.filter(c => c.id !== id), summary]);
   return json(summary);
 }

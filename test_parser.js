@@ -89,4 +89,38 @@ test('Garbage input yields no messages', () => {
   assert.equal(parseWhatsAppChat('').length, 0);
 });
 
+test('Text is not altered: emoji ZWJ sequences and Indic ZWJ/ZWNJ survive', () => {
+  const family = '👨‍👩‍👧', conjunct = 'क्‍ष', nonJoiner = 'र्‌य';
+  const [m] = parseWhatsAppChat(`15/01/2024, 09:12 - Papa: ${family} ${conjunct} ${nonJoiner}`);
+  assert.equal(m.text, `${family} ${conjunct} ${nonJoiner}`);
+});
+
+test('A date-like line inside a message stays in that message', () => {
+  const msgs = parseWhatsAppChat([
+    '15/01/2024, 09:13 - Harsh: Meeting notes:',
+    '12.05.2024 10:00 meeting at office',
+    '[1/2/24, 9:00 AM] pasted iOS line',
+    '15/01/2024, 09:14 - Papa: ok',
+  ].join('\n'));
+  assert.equal(msgs.length, 2);
+  assert.equal(msgs[0].text, 'Meeting notes:\n12.05.2024 10:00 meeting at office\n[1/2/24, 9:00 AM] pasted iOS line');
+});
+
+test('Contact names containing event words are still senders', () => {
+  const msgs = parseWhatsAppChat([
+    '15/01/2024, 09:14 - Mom Left: hello',
+    '15/01/2024, 09:15 - Harsh: hi',
+    '15/01/2024, 09:16 - Mom Left: ok',
+    '15/01/2024, 09:17 - Harsh changed the subject to "Trip: Goa"',
+    '15/01/2024, 09:18 - Harsh changed the subject to "Trip: Delhi"',
+  ].join('\n'));
+  assert.deepEqual(msgs.map(m => m.isSystem ? 'system' : m.sender), ['Mom Left', 'Harsh', 'Mom Left', 'system', 'system']);
+  assert.equal(msgs[0].text, 'hello');
+});
+
+test('Attachment names are NFC so they match uploaded file names', () => {
+  const [m] = parseWhatsAppChat('15/01/2024, 09:17 - Harsh: Résumé.pdf (file attached)');
+  assert.equal(m.attachment, 'Résumé.pdf'.normalize('NFC'));
+});
+
 console.log(`\n${passed} tests passed`);
